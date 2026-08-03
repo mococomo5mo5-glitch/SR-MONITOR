@@ -1,10 +1,10 @@
-name: Test Monitor
+name: USJ Monitor
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  hello:
     runs-on: ubuntu-latest
 
     steps:
