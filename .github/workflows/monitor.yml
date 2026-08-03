@@ -4,9 +4,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  hello:
+  monitor:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Hello
-        run: echo "Hello USJ!"
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright
+        run: playwright install chromium
+
+      - name: Run monitor
+        run: python monitor.py
