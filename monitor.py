@@ -7,8 +7,13 @@ with sync_playwright() as p:
 
     page = browser.new_page()
 
-    page.goto(URL, wait_until="networkidle")
+    page.goto(URL)
 
-    print(page.title())
+    page.wait_for_timeout(5000)
+
+    with open("page.html", "w", encoding="utf-8") as f:
+        f.write(page.content())
+
+    print("HTML saved.")
 
     browser.close()
