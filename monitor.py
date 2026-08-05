@@ -12,33 +12,19 @@ with sync_playwright() as p:
     page.goto(URL, wait_until="networkidle")
     page.wait_for_timeout(3000)
 
-    print("===== BUTTON LIST =====")
+adult_plus = page.get_by_label(
+    "¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"
+)
 
-    buttons = page.locator("button")
-    count = buttons.count()
+adult_plus.click()
+page.wait_for_timeout(500)
+adult_plus.click()
 
-    print(f"ボタン数: {count}")
+page.wait_for_timeout(1000)
 
-    for i in range(count):
-        try:
-            b = buttons.nth(i)
-            print("--------------------")
-            print(f"No.{i}")
+page.screenshot(path="page.png", full_page=True)
 
-            text = b.inner_text(timeout=1000)
-            print("text:", text)
+with open("page.html", "w", encoding="utf-8") as f:
+    f.write(page.content())
 
-            aria = b.get_attribute("aria-label")
-            print("aria:", aria)
-
-        except Exception:
-            pass
-
-    page.screenshot(path="page.png", full_page=True)
-
-    with open("page.html", "w", encoding="utf-8") as f:
-        f.write(page.content())
-
-    print("Finished.")
-
-    browser.close()
+print("Adult = 2")
