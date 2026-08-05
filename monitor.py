@@ -12,19 +12,21 @@ with sync_playwright() as p:
     page.goto(URL, wait_until="networkidle")
     page.wait_for_timeout(3000)
 
-adult_plus = page.get_by_label(
-    "¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"
-)
+    adult_plus = page.get_by_label(
+        "¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"
+    )
 
-adult_plus.click()
-page.wait_for_timeout(500)
-adult_plus.click()
+    adult_plus.click()
+    page.wait_for_timeout(500)
+    adult_plus.click()
 
-page.wait_for_timeout(1000)
+    page.wait_for_timeout(1000)
 
-page.screenshot(path="page.png", full_page=True)
+    page.screenshot(path="page.png", full_page=True)
 
-with open("page.html", "w", encoding="utf-8") as f:
-    f.write(page.content())
+    with open("page.html", "w", encoding="utf-8") as f:
+        f.write(page.content())
 
-print("Adult = 2")
+    print("Adult = 2")
+
+    browser.close()
