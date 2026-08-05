@@ -39,5 +39,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: usj-screenshot
-          path: page.png
+                - name: Upload Calendar
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: usj-calendar
+          path: calendar.json
