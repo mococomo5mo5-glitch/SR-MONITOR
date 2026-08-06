@@ -53,3 +53,10 @@ jobs:
         with:
           name: usj-calendar
           path: calendar.json
+
+      - name: Upload Changes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: usj-changes
+          path: changes.txt
