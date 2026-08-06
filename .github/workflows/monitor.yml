@@ -28,6 +28,10 @@ jobs:
       - name: Run monitor
         run: |
           python monitor.py
+          
+      - name: Compare
+        run: |
+          python compare.py
 
       - name: Upload HTML
         if: always()
