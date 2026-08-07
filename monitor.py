@@ -14,6 +14,9 @@ with sync_playwright() as p:
     page.goto(URL, wait_until="networkidle")
     page.wait_for_timeout(3000)
 
+    page.get_by_role("button", name="次へ進む").click()
+    page.wait_for_timeout(2000)
+
     # 大人2名にする
     adult_plus = page.get_by_label(
         "¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"
