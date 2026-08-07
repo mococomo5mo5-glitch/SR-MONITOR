@@ -10,7 +10,7 @@ with sync_playwright() as p:
     page = browser.new_page(
         viewport={"width":390,"height":844}
     )
-
+    
     page.goto(URL, wait_until="networkidle")
 
     # ページの読み込み待ち
