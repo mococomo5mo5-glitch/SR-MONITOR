@@ -1,6 +1,8 @@
 from playwright.sync_api import sync_playwright
 import json
 import re
+import os
+import requests
 
 URL = "https://store.usj.co.jp/ja/jp/store/c/extra/PCCSPRFD2A?config=true"
 
@@ -8,40 +10,43 @@ with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
 
     page = browser.new_page(
-        viewport={"width":390,"height":844}
+        viewport={"width": 390, "height": 844}
     )
-    
-    page.goto(URL, wait_until="networkidle")
 
-    # ページの読み込み待ち
+    page.goto(URL, wait_until="networkidle")
     page.wait_for_timeout(3000)
 
-    # 「＋」ボタンが表示されるまで待つ（最大60秒）
-    page.wait_for_selector(
-        '[aria-label*="1枚追加する"]',
+    # 大人2名の「＋」ボタン
+    adult_plus = page.locator(
+        'button[aria-label="¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"]:visible'
+    ).first
+
+    # 表示されるまで待つ
+    adult_plus.wait_for(
+        state="visible",
         timeout=60000
     )
 
     # 大人2名にする
-    adult_plus = page.get_by_label(
-        "¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"
-    )
-
     adult_plus.click()
     page.wait_for_timeout(500)
+
     adult_plus.click()
 
-    # カレンダーが更新されるまで待つ
+    # カレンダー更新待ち
     page.wait_for_timeout(3000)
 
-    # 最後までスクロール（10月・11月読み込み用）
+    # 最後までスクロール
+    # 11月まで読み込ませる
     last_height = 0
 
     for _ in range(20):
         page.mouse.wheel(0, 3000)
         page.wait_for_timeout(1200)
 
-        height = page.evaluate("document.body.scrollHeight")
+        height = page.evaluate(
+            "document.body.scrollHeight"
+        )
 
         if height == last_height:
             break
@@ -66,10 +71,25 @@ with sync_playwright() as p:
             if "2026年" not in aria:
                 continue
 
+            # 例：
+            # 2026年9月30日水曜日 - 7000
+            #
+            # または
+            # 2026年9月30日水曜日 -
+            if " - " in aria:
+                date, price = aria.split(
+                    " - ",
+                    1
+                )
+            else:
+                date = aria
+                price = ""
+
             text = btn.text_content()
 
             calendar.append({
-                "date": aria,
+                "date": date.strip(),
+                "price": price.strip(),
                 "text": text.strip() if text else ""
             })
 
@@ -78,29 +98,92 @@ with sync_playwright() as p:
 
     print("========== CALENDAR ==========")
 
-    for c in calendar:
-        print(c)
+    for item in calendar:
+        print(item)
 
-    with open("calendar.json", "w", encoding="utf-8") as f:
-        json.dump(calendar, f, ensure_ascii=False, indent=2)
+    # calendar.json保存
+    with open(
+        "calendar.json",
+        "w",
+        encoding="utf-8"
+    ) as f:
+        json.dump(
+            calendar,
+            f,
+            ensure_ascii=False,
+            indent=2
+        )
 
-
-    import os
-    import requests
-
+    # Discord Webhook
     webhook = os.getenv("DISCORD_WEBHOOK")
-    if webhook:
-        hits=[]
-        for item in calendar:
-            t=item.get("text","")
-            if "7000" in t or "¥7,000" in t:
-                hits.append(f"{item['date']} : {t}")
-        if hits:
-            requests.post(webhook,json={"content":"🎉 サンジのレストラン販売開始\n\n"+"\n".join(hits)})
-            print("Discord通知しました")
-        else:
-            print("販売なし")
 
-    page.screenshot(path="page.png", full_page=True)
+    if webhook:
+        print("DISCORD_WEBHOOK: 設定されています")
+
+        hits = []
+
+        for item in calendar:
+            price = item.get(
+                "price",
+                ""
+            )
+
+            # 7000円の販売情報を検出
+            if "7000" in price or "¥7,000" in price:
+                hits.append(
+                    f"{item['date']} : {price}"
+                )
+
+        if hits:
+            message = (
+                "🎉 サンジの海賊レストランに"
+                "販売情報がありました！\n\n"
+                + "\n".join(hits)
+            )
+
+            try:
+                response = requests.post(
+                    webhook,
+                    json={
+                        "content": message
+                    },
+                    timeout=20
+                )
+
+                print(
+                    "Discord response:",
+                    response.status_code
+                )
+
+                if response.status_code == 204:
+                    print(
+                        "Discord通知に成功しました"
+                    )
+                else:
+                    print(
+                        "Discord通知に失敗しました"
+                    )
+
+            except Exception as e:
+                print(
+                    "Discord notification error:",
+                    e
+                )
+
+        else:
+            print(
+                "販売情報なし"
+            )
+
+    else:
+        print(
+            "DISCORD_WEBHOOK が設定されていません"
+        )
+
+    # スクリーンショット
+    page.screenshot(
+        path="page.png",
+        full_page=True
+    )
 
     browser.close()
