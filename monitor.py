@@ -14,6 +14,7 @@ with sync_playwright() as p:
     page.goto(URL, wait_until="networkidle")
     page.wait_for_timeout(3000)
 
+    page.get_by_role("button", name="次へ進む").wait_for(state="visible")
     page.get_by_role("button", name="次へ進む").click()
     page.wait_for_timeout(2000)
 
