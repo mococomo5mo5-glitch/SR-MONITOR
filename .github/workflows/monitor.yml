@@ -29,16 +29,16 @@ jobs:
         run: |
           python monitor.py
 
-      - name: Upload HTML
+      - name: Upload Calendar
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: usj-html
-          path: before_next.html
+          name: usj-calendar
+          path: calendar.json
 
       - name: Upload Screenshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: usj-screenshot
-          path: before_next.png
+          path: page.png
