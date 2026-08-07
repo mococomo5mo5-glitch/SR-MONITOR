@@ -21,42 +21,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install Playwright
+      - name: Install Playwright browser
         run: |
           playwright install chromium
 
       - name: Run monitor
         run: |
           python monitor.py
-          
-      - name: Compare
-        run: |
-          python compare.py
 
       - name: Upload HTML
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: usj-html
-          path: page.html
+          path: before_next.html
 
       - name: Upload Screenshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: usj-screenshot
-          path: page.png
-
-      - name: Upload Calendar
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: usj-calendar
-          path: calendar.json
-
-      - name: Upload Changes
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: usj-changes
-          path: changes.txt
+          path: before_next.png
