@@ -55,26 +55,26 @@ with sync_playwright() as p:
     count = buttons.count()
 
     for i in range(count):
-    try:
-        btn = buttons.nth(i)
+        try:
+            btn = buttons.nth(i)
 
-        aria = btn.get_attribute("aria-label")
+            aria = btn.get_attribute("aria-label")
 
-        if not aria:
-            continue
+            if not aria:
+                continue
 
-        if "2026年" not in aria:
-            continue
+            if "2026年" not in aria:
+                continue
 
-        text = btn.text_content()
+            text = btn.text_content()
 
-        calendar.append({
-            "date": aria,
-            "text": text.strip() if text else ""
-        })
+            calendar.append({
+                "date": aria,
+                "text": text.strip() if text else ""
+            })
 
-    except Exception:
-        pass
+        except Exception:
+            pass
 
     print("========== CALENDAR ==========")
 
