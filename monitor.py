@@ -84,6 +84,23 @@ with sync_playwright() as p:
     with open("calendar.json", "w", encoding="utf-8") as f:
         json.dump(calendar, f, ensure_ascii=False, indent=2)
 
+
+    import os
+    import requests
+
+    webhook = os.getenv("DISCORD_WEBHOOK")
+    if webhook:
+        hits=[]
+        for item in calendar:
+            t=item.get("text","")
+            if "7000" in t or "¥7,000" in t:
+                hits.append(f"{item['date']} : {t}")
+        if hits:
+            requests.post(webhook,json={"content":"🎉 サンジのレストラン販売開始\n\n"+"\n".join(hits)})
+            print("Discord通知しました")
+        else:
+            print("販売なし")
+
     page.screenshot(path="page.png", full_page=True)
 
     browser.close()
