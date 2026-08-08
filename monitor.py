@@ -13,8 +13,8 @@ with sync_playwright() as p:
         viewport={"width": 390, "height": 844}
     )
 
-    page.goto(URL, wait_until="networkidle")
-    page.wait_for_timeout(3000)
+    page.goto(URL, wait_until="domcontentloaded", timeout=60000)
+    page.wait_for_timeout(5000)
 
     # 大人2名の「＋」ボタン
     adult_plus = page.locator(
