@@ -1,5 +1,7 @@
 from playwright.sync_api import sync_playwright
 import json
+import os
+import requests
 
 URL = "https://store.usj.co.jp/ja/jp/store/c/extra/PCCSPRFD2A?config=true"
 
@@ -27,7 +29,9 @@ def find_adult_plus(page):
         )
 
     for i in range(count):
+
         try:
+
             button = locator.nth(i)
 
             print(
@@ -44,6 +48,7 @@ def find_adult_plus(page):
             return button
 
         except Exception as e:
+
             print(
                 "ボタン取得エラー:",
                 e
@@ -55,7 +60,9 @@ def find_adult_plus(page):
 
 
 def get_adult_area_text(page, adult_plus):
+
     try:
+
         text = adult_plus.evaluate(
             """
             (el) => {
@@ -84,6 +91,7 @@ def get_adult_area_text(page, adult_plus):
         return text
 
     except Exception as e:
+
         print(
             "大人選択部分取得エラー:",
             e
@@ -93,10 +101,6 @@ def get_adult_area_text(page, adult_plus):
 
 
 def check_selected(text, number):
-    """
-    「1 selected 1」「2 selected 2」のように
-    現在の選択人数が表示されているか確認する。
-    """
 
     target = f"{number} selected {number}"
 
@@ -137,7 +141,7 @@ with sync_playwright() as p:
     )
 
     # ==================================================
-    # 2. 大人7,000円の＋ボタンを取得
+    # 2. 大人7,000円の＋ボタンを探す
     # ==================================================
 
     print(
@@ -147,7 +151,7 @@ with sync_playwright() as p:
     adult_plus = find_adult_plus(page)
 
     # ==================================================
-    # 3. クリック前
+    # 3. 現在の人数を確認
     # ==================================================
 
     before_text = get_adult_area_text(
@@ -160,131 +164,122 @@ with sync_playwright() as p:
         before_text
     )
 
-    print(
-        "クリック前の大人人数表示を確認します..."
-    )
+    # ==================================================
+    # 4. すでに2名ならそのまま進む
+    # ==================================================
 
-    if "0 selected 0" in before_text:
+    if "2 selected 2" in before_text:
+
         print(
-            "クリック前の大人人数: 0"
+            "すでに大人2名になっています。"
         )
-    elif "1 selected 1" in before_text:
-        print(
-            "クリック前の大人人数: 1"
-        )
-    elif "2 selected 2" in before_text:
-        print(
-            "クリック前の大人人数: 2"
-        )
+
     else:
+
+        # ==================================================
+        # 5. 1回目のクリック
+        # ==================================================
+
         print(
-            "クリック前の大人人数を判定できませんでした。"
+            "大人＋ボタンを1回クリックします..."
+        )
+
+        adult_plus.click(
+            timeout=30000
+        )
+
+        page.wait_for_timeout(1500)
+
+        adult_plus = find_adult_plus(page)
+
+        after_first_text = get_adult_area_text(
+            page,
+            adult_plus
+        )
+
+        print(
+            "大人選択部分:",
+            after_first_text
+        )
+
+        print(
+            "1回目クリック後の大人人数表示:",
+            after_first_text
+        )
+
+        if not check_selected(
+            after_first_text,
+            1
+        ):
+
+            page.screenshot(
+                path="error_after_first_click.png",
+                full_page=True
+            )
+
+            raise RuntimeError(
+                "1回目のクリック後に"
+                "「1 selected 1」を確認できませんでした。"
+                f"現在の表示={after_first_text}"
+            )
+
+        print(
+            "1回目クリック成功：大人1名を確認しました。"
+        )
+
+        # ==================================================
+        # 6. 2回目のクリック
+        # ==================================================
+
+        print(
+            "大人＋ボタンを2回目クリックします..."
+        )
+
+        adult_plus.click(
+            timeout=30000
+        )
+
+        page.wait_for_timeout(2000)
+
+        adult_plus = find_adult_plus(page)
+
+        after_second_text = get_adult_area_text(
+            page,
+            adult_plus
+        )
+
+        print(
+            "大人選択部分:",
+            after_second_text
+        )
+
+        print(
+            "2回目クリック後の大人人数表示:",
+            after_second_text
+        )
+
+        if not check_selected(
+            after_second_text,
+            2
+        ):
+
+            page.screenshot(
+                path="error_after_second_click.png",
+                full_page=True
+            )
+
+            raise RuntimeError(
+                "2回目のクリック後に"
+                "「2 selected 2」を確認できませんでした。"
+                f"現在の表示={after_second_text}"
+            )
+
+        print(
+            "2回目クリック成功：大人2名を確認しました。"
         )
 
     # ==================================================
-    # 4. 大人1名
-    # ==================================================
-
-    print(
-        "大人＋ボタンを1回クリックします..."
-    )
-
-    adult_plus.click(
-        timeout=30000
-    )
-
-    page.wait_for_timeout(1500)
-
-    adult_plus = find_adult_plus(page)
-
-    after_first_text = get_adult_area_text(
-        page,
-        adult_plus
-    )
-
-    print(
-        "大人選択部分:",
-        after_first_text
-    )
-
-    print(
-        "1回目クリック後の大人人数表示:",
-        after_first_text
-    )
-
-    if not check_selected(
-        after_first_text,
-        1
-    ):
-
-        page.screenshot(
-            path="error_after_first_click.png",
-            full_page=True
-        )
-
-        raise RuntimeError(
-            "1回目のクリック後に"
-            "「1 selected 1」を確認できませんでした。"
-            f"現在の表示={after_first_text}"
-        )
-
-    print(
-        "1回目クリック成功：大人1名を確認しました。"
-    )
-
-    # ==================================================
-    # 5. 大人2名
-    # ==================================================
-
-    print(
-        "大人＋ボタンを2回目クリックします..."
-    )
-
-    adult_plus.click(
-        timeout=30000
-    )
-
-    page.wait_for_timeout(2000)
-
-    adult_plus = find_adult_plus(page)
-
-    after_second_text = get_adult_area_text(
-        page,
-        adult_plus
-    )
-
-    print(
-        "大人選択部分:",
-        after_second_text
-    )
-
-    print(
-        "2回目クリック後の大人人数表示:",
-        after_second_text
-    )
-
-    if not check_selected(
-        after_second_text,
-        2
-    ):
-
-        page.screenshot(
-            path="error_after_second_click.png",
-            full_page=True
-        )
-
-        raise RuntimeError(
-            "2回目のクリック後に"
-            "「2 selected 2」を確認できませんでした。"
-            f"現在の表示={after_second_text}"
-        )
-
-    print(
-        "2回目クリック成功：大人2名を確認しました。"
-    )
-
-    # ==================================================
-    # 6. カレンダー更新待ち
+    # 7. カレンダー更新待ち
     # ==================================================
 
     page.wait_for_timeout(3000)
@@ -294,7 +289,7 @@ with sync_playwright() as p:
     )
 
     # ==================================================
-    # 7. 最後までスクロール
+    # 8. 最後までスクロール
     # ==================================================
 
     last_height = 0
@@ -323,7 +318,7 @@ with sync_playwright() as p:
         last_height = height
 
     # ==================================================
-    # 8. カレンダー取得
+    # 9. カレンダー取得
     # ==================================================
 
     calendar = []
@@ -367,15 +362,44 @@ with sync_playwright() as p:
 
             text = button.text_content()
 
+            if text:
+                text = text.strip()
+            else:
+                text = ""
+
+            # ------------------------------------------
+            # 販売可否を確認
+            # ------------------------------------------
+
+            try:
+
+                disabled = button.is_disabled()
+
+            except Exception:
+
+                disabled = None
+
+            aria_disabled = button.get_attribute(
+                "aria-disabled"
+            )
+
+            class_name = button.get_attribute(
+                "class"
+            )
+
+            button_id = button.get_attribute(
+                "id"
+            )
+
             calendar.append(
                 {
                     "date": date.strip(),
                     "price": price.strip(),
-                    "text": (
-                        text.strip()
-                        if text
-                        else ""
-                    )
+                    "text": text,
+                    "disabled": disabled,
+                    "aria_disabled": aria_disabled,
+                    "class": class_name,
+                    "id": button_id
                 }
             )
 
@@ -383,7 +407,7 @@ with sync_playwright() as p:
             pass
 
     # ==================================================
-    # 9. カレンダー表示
+    # 10. カレンダー表示
     # ==================================================
 
     print(
@@ -391,6 +415,7 @@ with sync_playwright() as p:
     )
 
     for item in calendar:
+
         print(
             item
         )
@@ -401,7 +426,7 @@ with sync_playwright() as p:
     )
 
     # ==================================================
-    # 10. calendar.json
+    # 11. calendar.json保存
     # ==================================================
 
     with open(
@@ -422,205 +447,183 @@ with sync_playwright() as p:
     )
 
     # ==================================================
-    # 11. 7000円の日を詳細調査
+    # 12. 販売可能日の判定
     # ==================================================
+
+    available_dates = []
 
     print("")
     print(
         "=========================================="
     )
     print(
-        "7000円の日の詳細調査"
+        "販売可能日を確認しています..."
     )
     print(
         "=========================================="
     )
 
-    detailed_calendar = []
+    for item in calendar:
 
-    buttons = page.locator("button")
-
-    count = buttons.count()
-
-    for i in range(count):
-
-        try:
-
-            button = buttons.nth(i)
-
-            aria = button.get_attribute(
-                "aria-label"
-            )
-
-            if not aria:
-                continue
-
-            if "2026年" not in aria:
-                continue
-
-            if (
-                "7000" not in aria
-                and "¥7,000" not in aria
-            ):
-                continue
-
-            if " - " in aria:
-
-                date, price = aria.split(
-                    " - ",
-                    1
-                )
-
-            else:
-
-                date = aria
-                price = ""
-
-            # disabled
-            try:
-                disabled = button.is_disabled()
-            except Exception:
-                disabled = None
-
-            # aria-disabled
-            aria_disabled = button.get_attribute(
-                "aria-disabled"
-            )
-
-            # class
-            class_name = button.get_attribute(
-                "class"
-            )
-
-            # id
-            button_id = button.get_attribute(
-                "id"
-            )
-
-            # text
-            text_content = button.text_content()
-
-            if text_content:
-                text_content = text_content.strip()
-            else:
-                text_content = ""
-
-            # HTML
-            outer_html = button.evaluate(
-                "(el) => el.outerHTML"
-            )
-
-            detail = {
-                "date": date.strip(),
-                "price": price.strip(),
-                "text": text_content,
-                "disabled": disabled,
-                "aria_disabled": aria_disabled,
-                "class": class_name,
-                "id": button_id,
-                "outer_html": outer_html
-            }
-
-            detailed_calendar.append(
-                detail
-            )
-
-            print("")
-            print(
-                "========== 7000円詳細 =========="
-            )
-
-            print(
-                "date:",
-                detail["date"]
-            )
-
-            print(
-                "price:",
-                detail["price"]
-            )
-
-            print(
-                "text:",
-                detail["text"]
-            )
-
-            print(
-                "disabled:",
-                detail["disabled"]
-            )
-
-            print(
-                "aria-disabled:",
-                detail["aria_disabled"]
-            )
-
-            print(
-                "class:",
-                detail["class"]
-            )
-
-            print(
-                "id:",
-                detail["id"]
-            )
-
-            print(
-                "HTML:"
-            )
-
-            print(
-                detail["outer_html"]
-            )
-
-            print(
-                "================================"
-            )
-
-        except Exception as e:
-
-            print(
-                "7000円詳細取得エラー:",
-                e
-            )
-
-    # ==================================================
-    # 12. 詳細JSON
-    # ==================================================
-
-    with open(
-        "calendar_detail.json",
-        "w",
-        encoding="utf-8"
-    ) as f:
-
-        json.dump(
-            detailed_calendar,
-            f,
-            ensure_ascii=False,
-            indent=2
+        price = item.get(
+            "price",
+            ""
         )
 
+        disabled = item.get(
+            "disabled"
+        )
+
+        aria_disabled = item.get(
+            "aria_disabled"
+        )
+
+        # ------------------------------------------
+        # 価格判定
+        # ------------------------------------------
+
+        price_is_7000 = (
+            "7000" in price
+            or "¥7,000" in price
+        )
+
+        # ------------------------------------------
+        # disabled判定
+        # ------------------------------------------
+
+        is_enabled = (
+            disabled is False
+        )
+
+        # ------------------------------------------
+        # aria-disabled判定
+        # ------------------------------------------
+
+        aria_is_enabled = (
+            aria_disabled != "true"
+        )
+
+        # ------------------------------------------
+        # 最終判定
+        # ------------------------------------------
+
+        if (
+            price_is_7000
+            and is_enabled
+            and aria_is_enabled
+        ):
+
+            available_dates.append(
+                item
+            )
+
+            print(
+                "★ 販売可能:",
+                item
+            )
+
+        else:
+
+            # 調査用ログ
+            if price_is_7000:
+
+                print(
+                    "販売不可:",
+                    item["date"],
+                    "| price=",
+                    price,
+                    "| disabled=",
+                    disabled,
+                    "| aria-disabled=",
+                    aria_disabled
+                )
+
     print(
-        "calendar_detail.json を保存しました"
+        "販売可能日数:",
+        len(available_dates)
     )
 
     # ==================================================
-    # 13. Discord通知は今回しない
+    # 13. Discord通知
     # ==================================================
 
-    print("")
-    print(
-        "=========================================="
+    webhook = os.getenv(
+        "DISCORD_WEBHOOK"
     )
 
-    print(
-        "今回は調査用のため、Discord通知は行いません。"
-    )
+    if webhook:
 
-    print(
-        "=========================================="
-    )
+        print(
+            "DISCORD_WEBHOOK: 設定されています"
+        )
+
+        if available_dates:
+
+            lines = []
+
+            for item in available_dates:
+
+                lines.append(
+                    f"{item['date']} : "
+                    f"{item['price']}"
+                )
+
+            message = (
+                "🎉 サンジの海賊レストラン"
+                "販売開始の可能性があります！\n\n"
+                + "\n".join(lines)
+            )
+
+            try:
+
+                response = requests.post(
+                    webhook,
+                    json={
+                        "content": message
+                    },
+                    timeout=20
+                )
+
+                print(
+                    "Discord response:",
+                    response.status_code
+                )
+
+                if response.status_code == 204:
+
+                    print(
+                        "Discord通知に成功しました"
+                    )
+
+                else:
+
+                    print(
+                        "Discord通知に失敗しました"
+                    )
+
+            except Exception as e:
+
+                print(
+                    "Discord notification error:",
+                    e
+                )
+
+        else:
+
+            print(
+                "販売可能日はありません。"
+            )
+
+            print(
+                "Discord通知は行いません。"
+            )
+
+    else:
+
+        print(
+            "DISCORD_WEBHOOK が"
+            "設定されていません。"
+        )
 
     # ==================================================
     # 14. スクリーンショット
