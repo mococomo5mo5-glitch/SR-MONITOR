@@ -1,64 +1,325 @@
 from playwright.sync_api import sync_playwright
 import json
-import re
 import os
+import re
 import requests
+
 
 URL = "https://store.usj.co.jp/ja/jp/store/c/extra/PCCSPRFD2A?config=true"
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
+ADULT_PLUS_LABEL = (
+    "¥7,000 の サンジの海賊レストラン（2名以上） "
+    "を1枚追加する"
+)
 
-    page = browser.new_page(
-        viewport={"width": 390, "height": 844}
+
+def get_adult_quantity(page, adult_plus):
+    """
+    大人7,000円の＋ボタン周辺から、
+    現在の大人人数を取得する。
+    """
+
+    try:
+        text = adult_plus.evaluate(
+            """
+            (el) => {
+                let node = el;
+
+                for (let i = 0; i < 8 && node; i++) {
+                    const text = (node.innerText || "")
+                        .replace(/\\s+/g, " ")
+                        .trim();
+
+                    if (
+                        text.includes("大人") &&
+                        text.includes("7,000")
+                    ) {
+                        return text;
+                    }
+
+                    node = node.parentElement;
+                }
+
+                return "";
+            }
+            """
+        )
+
+        print("大人選択部分:", text)
+
+        # 例:
+        # 大人 ¥7,000（税込） - 0 +
+        # のような表示から数字を取得する。
+        #
+        # 7,000は価格なので除外し、
+        # 0～9の単独数字の最後を人数として扱う。
+        numbers = re.findall(r"(?<![\d,])\d+(?![\d,])", text)
+
+        candidates = []
+
+        for number in numbers:
+            try:
+                value = int(number)
+
+                if 0 <= value <= 9:
+                    candidates.append(value)
+
+            except ValueError:
+                pass
+
+        if candidates:
+            return candidates[-1]
+
+    except Exception as e:
+        print("人数取得エラー:", e)
+
+    return None
+
+
+def find_visible_adult_plus(page):
+    """
+    大人7,000円の＋ボタンのうち、
+    実際に表示されているものを探す。
+    """
+
+    locator = page.locator(
+        f'button[aria-label="{ADULT_PLUS_LABEL}"]'
+    ).filter(
+        visible=True
     )
 
-    page.goto(URL, wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(5000)
-
-    # 大人2名の「＋」ボタンを探す
-    adult_plus = page.get_by_label(
-        "¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"
-    ).first
-
-    # ボタンがDOM上に現れるまで最大60秒待つ
-    adult_plus.wait_for(
-        state="attached",
+    # 最大60秒待つ
+    locator.first.wait_for(
+        state="visible",
         timeout=60000
     )
 
-    # 表示状態になるまで少し待つ
+    count = locator.count()
+
+    print("表示されている大人＋ボタン:", count)
+
+    # 複数ある場合でも、表示されているものだけを対象にする。
+    for i in range(count):
+        candidate = locator.nth(i)
+
+        try:
+            if not candidate.is_visible():
+                continue
+
+            candidate.scroll_into_view_if_needed()
+
+            page.wait_for_timeout(500)
+
+            print(
+                "大人＋ボタンを使用:",
+                i + 1,
+                "/",
+                count
+            )
+
+            return candidate
+
+        except Exception:
+            continue
+
+    raise RuntimeError(
+        "表示されている大人7,000円の＋ボタンを"
+        "見つけられませんでした。"
+    )
+
+
+with sync_playwright() as p:
+
+    browser = p.chromium.launch(
+        headless=True
+    )
+
+    page = browser.new_page(
+        viewport={
+            "width": 390,
+            "height": 844
+        }
+    )
+
+    # --------------------------------------------------
+    # 1. USJページを開く
+    # --------------------------------------------------
+
+    print("USJページを開いています...")
+
+    page.goto(
+        URL,
+        wait_until="domcontentloaded",
+        timeout=60000
+    )
+
     page.wait_for_timeout(5000)
 
-    # 画面内にスクロール
-    adult_plus.scroll_into_view_if_needed()
+    print("USJページ読み込み完了")
 
-    # 大人2名にする
-    adult_plus.click(force=True)
+    # --------------------------------------------------
+    # 2. 大人2名にする
+    # --------------------------------------------------
 
-    page.wait_for_timeout(500)
+    print("大人7,000円の＋ボタンを探しています...")
 
-    adult_plus.click(force=True)
+    adult_plus = find_visible_adult_plus(page)
 
-    # 大人2名にする
-    adult_plus.click()
-    page.wait_for_timeout(500)
+    # 現在の人数を確認
+    quantity_before = get_adult_quantity(
+        page,
+        adult_plus
+    )
 
-    adult_plus.click()
+    print(
+        "クリック前の大人人数:",
+        quantity_before
+    )
 
-    # カレンダー更新待ち
+    # すでに2名ならクリックしない
+    if quantity_before == 2:
+
+        print(
+            "すでに大人2名になっています。"
+        )
+
+    else:
+
+        # ----------------------------------------------
+        # 1回目のクリック
+        # ----------------------------------------------
+
+        print(
+            "大人＋ボタンを1回クリックします..."
+        )
+
+        adult_plus.click(
+            timeout=30000
+        )
+
+        page.wait_for_timeout(1500)
+
+        # ボタンは画面更新で入れ替わる可能性があるので、
+        # もう一度探し直す。
+        adult_plus = find_visible_adult_plus(
+            page
+        )
+
+        quantity_after_first = (
+            get_adult_quantity(
+                page,
+                adult_plus
+            )
+        )
+
+        print(
+            "1回目クリック後の大人人数:",
+            quantity_after_first
+        )
+
+        if quantity_after_first != 1:
+            page.screenshot(
+                path="error_after_first_click.png",
+                full_page=True
+            )
+
+            raise RuntimeError(
+                "大人＋ボタンを1回押した後、"
+                "大人人数が1になりませんでした。"
+                f"現在の人数={quantity_after_first}"
+            )
+
+        # ----------------------------------------------
+        # 2回目のクリック
+        # ----------------------------------------------
+
+        print(
+            "大人＋ボタンを2回目クリックします..."
+        )
+
+        adult_plus.click(
+            timeout=30000
+        )
+
+        page.wait_for_timeout(2000)
+
+        # ----------------------------------------------
+        # 2名になったことを確認
+        # ----------------------------------------------
+
+        adult_plus = find_visible_adult_plus(
+            page
+        )
+
+        quantity_after_second = (
+            get_adult_quantity(
+                page,
+                adult_plus
+            )
+        )
+
+        print(
+            "2回目クリック後の大人人数:",
+            quantity_after_second
+        )
+
+        if quantity_after_second != 2:
+
+            page.screenshot(
+                path="error_after_second_click.png",
+                full_page=True
+            )
+
+            raise RuntimeError(
+                "大人＋ボタンを2回押した後、"
+                "大人人数が2になりませんでした。"
+                f"現在の人数={quantity_after_second}"
+            )
+
+    # --------------------------------------------------
+    # 3. 大人2名を確認
+    # --------------------------------------------------
+
+    print(
+        "大人2名を確認しました。"
+    )
+
     page.wait_for_timeout(3000)
 
-    # 最後までスクロール
-    # 11月まで読み込ませる
+    # この時点の画面を保存
+    page.screenshot(
+        path="after_adult_2.png",
+        full_page=True
+    )
+
+    # --------------------------------------------------
+    # 4. カレンダーを最後まで読み込む
+    # --------------------------------------------------
+
+    print(
+        "カレンダーを読み込んでいます..."
+    )
+
     last_height = 0
 
-    for _ in range(20):
-        page.mouse.wheel(0, 3000)
-        page.wait_for_timeout(1200)
+    for _ in range(25):
+
+        page.mouse.wheel(
+            0,
+            3000
+        )
+
+        page.wait_for_timeout(
+            1200
+        )
 
         height = page.evaluate(
             "document.body.scrollHeight"
+        )
+
+        print(
+            "ページ高さ:",
+            height
         )
 
         if height == last_height:
@@ -66,17 +327,30 @@ with sync_playwright() as p:
 
         last_height = height
 
-    # カレンダー取得
+    # --------------------------------------------------
+    # 5. カレンダー取得
+    # --------------------------------------------------
+
     calendar = []
 
     buttons = page.locator("button")
+
     count = buttons.count()
 
-    for i in range(count):
-        try:
-            btn = buttons.nth(i)
+    print(
+        "ボタン総数:",
+        count
+    )
 
-            aria = btn.get_attribute("aria-label")
+    for i in range(count):
+
+        try:
+
+            button = buttons.nth(i)
+
+            aria = button.get_attribute(
+                "aria-label"
+            )
 
             if not aria:
                 continue
@@ -84,42 +358,66 @@ with sync_playwright() as p:
             if "2026年" not in aria:
                 continue
 
-            # 例：
-            # 2026年9月30日水曜日 - 7000
+            # 例:
+            # 2026年8月14日金曜日 - 7000
             #
-            # または
-            # 2026年9月30日水曜日 -
+            # または:
+            # 2026年8月1日土曜日 -
             if " - " in aria:
+
                 date, price = aria.split(
                     " - ",
                     1
                 )
+
             else:
+
                 date = aria
                 price = ""
 
-            text = btn.text_content()
+            text = button.text_content()
 
-            calendar.append({
-                "date": date.strip(),
-                "price": price.strip(),
-                "text": text.strip() if text else ""
-            })
+            calendar.append(
+                {
+                    "date": date.strip(),
+                    "price": price.strip(),
+                    "text": (
+                        text.strip()
+                        if text
+                        else ""
+                    )
+                }
+            )
 
         except Exception:
             pass
 
-    print("========== CALENDAR ==========")
+    # --------------------------------------------------
+    # 6. カレンダー表示
+    # --------------------------------------------------
+
+    print(
+        "========== CALENDAR =========="
+    )
 
     for item in calendar:
         print(item)
 
-    # calendar.json保存
+    print(
+        "カレンダー件数:",
+        len(calendar)
+    )
+
+    # --------------------------------------------------
+    # 7. JSON保存
+    # --------------------------------------------------
+
     with open(
         "calendar.json",
         "w",
         encoding="utf-8"
     ) as f:
+
         json.dump(
             calendar,
             f,
@@ -127,34 +425,52 @@ with sync_playwright() as p:
             indent=2
         )
 
-    # Discord Webhook
-    webhook = os.getenv("DISCORD_WEBHOOK")
+    print(
+        "calendar.json を保存しました"
+    )
+
+    # --------------------------------------------------
+    # 8. Discord通知
+    # --------------------------------------------------
+
+    webhook = os.getenv(
+        "DISCORD_WEBHOOK"
+    )
 
     if webhook:
-        print("DISCORD_WEBHOOK: 設定されています")
+
+        print(
+            "DISCORD_WEBHOOK: 設定されています"
+        )
 
         hits = []
 
         for item in calendar:
+
             price = item.get(
                 "price",
                 ""
             )
 
-            # 7000円の販売情報を検出
-            if "7000" in price or "¥7,000" in price:
+            if (
+                "7000" in price
+                or "¥7,000" in price
+            ):
+
                 hits.append(
                     f"{item['date']} : {price}"
                 )
 
         if hits:
+
             message = (
-                "🎉 サンジの海賊レストランに"
-                "販売情報がありました！\n\n"
+                "🎉 サンジの海賊レストラン"
+                "に販売情報がありました！\n\n"
                 + "\n".join(hits)
             )
 
             try:
+
                 response = requests.post(
                     webhook,
                     json={
@@ -169,34 +485,52 @@ with sync_playwright() as p:
                 )
 
                 if response.status_code == 204:
+
                     print(
                         "Discord通知に成功しました"
                     )
+
                 else:
+
                     print(
                         "Discord通知に失敗しました"
                     )
 
             except Exception as e:
+
                 print(
                     "Discord notification error:",
                     e
                 )
 
         else:
+
             print(
                 "販売情報なし"
             )
 
     else:
+
         print(
-            "DISCORD_WEBHOOK が設定されていません"
+            "DISCORD_WEBHOOK が"
+            "設定されていません"
         )
 
-    # スクリーンショット
+    # --------------------------------------------------
+    # 9. 最終スクリーンショット
+    # --------------------------------------------------
+
     page.screenshot(
         path="page.png",
         full_page=True
     )
 
+    print(
+        "スクリーンショットを保存しました"
+    )
+
     browser.close()
+
+    print(
+        "========== MONITOR COMPLETE =========="
+    )
