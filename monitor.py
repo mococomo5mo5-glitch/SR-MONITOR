@@ -2,7 +2,6 @@ from playwright.sync_api import sync_playwright
 import json
 import re
 
-
 URL = "https://store.usj.co.jp/ja/jp/store/c/extra/PCCSPRFD2A?config=true"
 
 ADULT_PLUS_LABEL = (
@@ -12,11 +11,6 @@ ADULT_PLUS_LABEL = (
 
 
 def get_adult_quantity(page, adult_plus):
-    """
-    大人7,000円の＋ボタン周辺から
-    現在の大人人数を取得する。
-    """
-
     try:
         text = adult_plus.evaluate(
             """
@@ -71,10 +65,11 @@ def get_adult_quantity(page, adult_plus):
     return None
 
 
-def find_visible_adult_plus(page):
+def find_adult_plus(page):
     """
-    実際に表示されている
-    大人7,000円の＋ボタンを探す。
+    前回成功した方法。
+    aria-labelが一致するボタンを探し、
+    最初に見つかったボタンを使用する。
     """
 
     locator = page.locator(
@@ -88,31 +83,38 @@ def find_visible_adult_plus(page):
         count
     )
 
+    if count == 0:
+        raise RuntimeError(
+            "大人7,000円の＋ボタンが見つかりませんでした。"
+        )
+
     for i in range(count):
 
         try:
             candidate = locator.nth(i)
 
-            if not candidate.is_visible():
-                continue
+            print(
+                "大人＋ボタンを使用:",
+                i + 1,
+                "/",
+                count
+            )
 
             candidate.scroll_into_view_if_needed()
 
             page.wait_for_timeout(500)
 
-            print(
-                "表示されている大人＋ボタン:",
-                i + 1
-            )
-
             return candidate
 
-        except Exception:
-            continue
+        except Exception as e:
+
+            print(
+                "ボタン取得エラー:",
+                e
+            )
 
     raise RuntimeError(
-        "表示されている大人7,000円の＋ボタンを"
-        "見つけられませんでした。"
+        "大人7,000円の＋ボタンを取得できませんでした。"
     )
 
 
@@ -157,7 +159,7 @@ with sync_playwright() as p:
         "大人7,000円の＋ボタンを探しています..."
     )
 
-    adult_plus = find_visible_adult_plus(page)
+    adult_plus = find_adult_plus(page)
 
     quantity_before = get_adult_quantity(
         page,
@@ -169,17 +171,21 @@ with sync_playwright() as p:
         quantity_before
     )
 
+    # ----------------------------------------------
+    # すでに2名の場合
+    # ----------------------------------------------
+
     if quantity_before == 2:
 
         print(
-            "すでに大人2名です。"
+            "すでに大人2名になっています。"
         )
 
     else:
 
-        # ------------------------------
+        # ------------------------------------------
         # 1回目
-        # ------------------------------
+        # ------------------------------------------
 
         print(
             "大人＋ボタンを1回クリックします..."
@@ -191,9 +197,9 @@ with sync_playwright() as p:
 
         page.wait_for_timeout(1500)
 
-        adult_plus = find_visible_adult_plus(
-            page
-        )
+        # ページ更新でボタンが入れ替わる可能性が
+        # あるため、もう一度取得
+        adult_plus = find_adult_plus(page)
 
         quantity_after_first = (
             get_adult_quantity(
@@ -217,12 +223,12 @@ with sync_playwright() as p:
             raise RuntimeError(
                 "1回目のクリック後に"
                 "大人人数が1になりませんでした。"
-                f"現在={quantity_after_first}"
+                f"現在の人数={quantity_after_first}"
             )
 
-        # ------------------------------
+        # ------------------------------------------
         # 2回目
-        # ------------------------------
+        # ------------------------------------------
 
         print(
             "大人＋ボタンを2回目クリックします..."
@@ -234,9 +240,7 @@ with sync_playwright() as p:
 
         page.wait_for_timeout(2000)
 
-        adult_plus = find_visible_adult_plus(
-            page
-        )
+        adult_plus = find_adult_plus(page)
 
         quantity_after_second = (
             get_adult_quantity(
@@ -260,7 +264,7 @@ with sync_playwright() as p:
             raise RuntimeError(
                 "2回目のクリック後に"
                 "大人人数が2になりませんでした。"
-                f"現在={quantity_after_second}"
+                f"現在の人数={quantity_after_second}"
             )
 
     print(
@@ -270,7 +274,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(3000)
 
     # ==================================================
-    # 3. カレンダーを読み込む
+    # 3. カレンダーを最後まで読み込む
     # ==================================================
 
     print(
@@ -363,7 +367,7 @@ with sync_playwright() as p:
             pass
 
     # ==================================================
-    # 5. 通常のカレンダーJSON保存
+    # 5. 通常カレンダーを表示
     # ==================================================
 
     print(
@@ -371,12 +375,19 @@ with sync_playwright() as p:
     )
 
     for item in calendar:
-        print(item)
+
+        print(
+            item
+        )
 
     print(
         "カレンダー件数:",
         len(calendar)
     )
+
+    # ==================================================
+    # 6. calendar.json保存
+    # ==================================================
 
     with open(
         "calendar.json",
@@ -396,26 +407,26 @@ with sync_playwright() as p:
     )
 
     # ==================================================
-    # 6. 7000円の日を詳しく調査
+    # 7. 7000円の日を詳細調査
     # ==================================================
 
-    print(
-        ""
-    )
-
+    print("")
     print(
         "=========================================="
     )
-
     print(
-        "7000円の日の詳細調査を開始"
+        "7000円の日の詳細調査"
     )
-
     print(
         "=========================================="
     )
 
     detailed_calendar = []
+
+    # ボタン数をもう一度取得
+    buttons = page.locator("button")
+
+    count = buttons.count()
 
     for i in range(count):
 
@@ -433,37 +444,15 @@ with sync_playwright() as p:
             if "2026年" not in aria:
                 continue
 
-            if "7000" not in aria and "¥7,000" not in aria:
+            if (
+                "7000" not in aria
+                and "¥7,000" not in aria
+            ):
                 continue
 
             # ------------------------------------------
-            # 各種属性を取得
+            # 日付と価格
             # ------------------------------------------
-
-            disabled = awaitable_dummy = None
-
-            try:
-                disabled = button.is_disabled()
-            except Exception:
-                disabled = None
-
-            aria_disabled = button.get_attribute(
-                "aria-disabled"
-            )
-
-            class_name = button.get_attribute(
-                "class"
-            )
-
-            button_id = button.get_attribute(
-                "id"
-            )
-
-            text_content = button.text_content()
-
-            outer_html = button.evaluate(
-                "(el) => el.outerHTML"
-            )
 
             if " - " in aria:
 
@@ -477,14 +466,65 @@ with sync_playwright() as p:
                 date = aria
                 price = ""
 
+            # ------------------------------------------
+            # disabled
+            # ------------------------------------------
+
+            try:
+
+                disabled = button.is_disabled()
+
+            except Exception:
+
+                disabled = None
+
+            # ------------------------------------------
+            # aria-disabled
+            # ------------------------------------------
+
+            aria_disabled = button.get_attribute(
+                "aria-disabled"
+            )
+
+            # ------------------------------------------
+            # class
+            # ------------------------------------------
+
+            class_name = button.get_attribute(
+                "class"
+            )
+
+            # ------------------------------------------
+            # id
+            # ------------------------------------------
+
+            button_id = button.get_attribute(
+                "id"
+            )
+
+            # ------------------------------------------
+            # text
+            # ------------------------------------------
+
+            text_content = button.text_content()
+
+            if text_content:
+                text_content = text_content.strip()
+            else:
+                text_content = ""
+
+            # ------------------------------------------
+            # HTML
+            # ------------------------------------------
+
+            outer_html = button.evaluate(
+                "(el) => el.outerHTML"
+            )
+
             detail = {
                 "date": date.strip(),
                 "price": price.strip(),
-                "text": (
-                    text_content.strip()
-                    if text_content
-                    else ""
-                ),
+                "text": text_content,
                 "disabled": disabled,
                 "aria_disabled": aria_disabled,
                 "class": class_name,
@@ -496,12 +536,13 @@ with sync_playwright() as p:
                 detail
             )
 
-            print(
-                ""
-            )
+            # ------------------------------------------
+            # ログ出力
+            # ------------------------------------------
 
+            print("")
             print(
-                "===== 7000円詳細 ====="
+                "========== 7000円詳細 =========="
             )
 
             print(
@@ -548,7 +589,7 @@ with sync_playwright() as p:
             )
 
             print(
-                "======================"
+                "================================"
             )
 
         except Exception as e:
@@ -559,7 +600,7 @@ with sync_playwright() as p:
             )
 
     # ==================================================
-    # 7. 詳細調査JSON保存
+    # 8. 詳細JSON保存
     # ==================================================
 
     with open(
@@ -576,23 +617,20 @@ with sync_playwright() as p:
         )
 
     print(
-        ""
-    )
-
-    print(
         "calendar_detail.json を保存しました"
     )
 
+    # ==================================================
+    # 9. 今回はDiscord通知しない
+    # ==================================================
+
+    print("")
     print(
         "=========================================="
     )
 
     print(
-        "調査終了"
-    )
-
-    print(
-        "今回はDiscord通知を行いません。"
+        "今回は調査用のため、Discord通知は行いません。"
     )
 
     print(
@@ -600,7 +638,7 @@ with sync_playwright() as p:
     )
 
     # ==================================================
-    # 8. スクリーンショット
+    # 10. スクリーンショット
     # ==================================================
 
     page.screenshot(
@@ -616,4 +654,4 @@ with sync_playwright() as p:
 
     print(
         "========== MONITOR COMPLETE =========="
-    )
+            )
