@@ -16,16 +16,29 @@ with sync_playwright() as p:
     page.goto(URL, wait_until="domcontentloaded", timeout=60000)
     page.wait_for_timeout(5000)
 
-    # 大人2名の「＋」ボタン
-    adult_plus = page.locator(
-        'button[aria-label="¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"]:visible'
+    # 大人2名の「＋」ボタンを探す
+    adult_plus = page.get_by_label(
+        "¥7,000 の サンジの海賊レストラン（2名以上） を1枚追加する"
     ).first
 
-    # 表示されるまで待つ
+    # ボタンがDOM上に現れるまで最大60秒待つ
     adult_plus.wait_for(
-        state="visible",
+        state="attached",
         timeout=60000
     )
+
+    # 表示状態になるまで少し待つ
+    page.wait_for_timeout(5000)
+
+    # 画面内にスクロール
+    adult_plus.scroll_into_view_if_needed()
+
+    # 大人2名にする
+    adult_plus.click(force=True)
+
+    page.wait_for_timeout(500)
+
+    adult_plus.click(force=True)
 
     # 大人2名にする
     adult_plus.click()
