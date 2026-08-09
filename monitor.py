@@ -5,6 +5,11 @@ import requests
 import time
 from datetime import datetime
 
+
+# ==================================================
+# 基本設定
+# ==================================================
+
 URL = "https://store.usj.co.jp/ja/jp/store/c/extra/PCCSPRFD2A?config=true"
 
 ADULT_PLUS_LABEL = (
@@ -12,18 +17,28 @@ ADULT_PLUS_LABEL = (
     "を1枚追加する"
 )
 
-# ==================================================
-# 監視設定
-# ==================================================
-
-# 5分ごとに確認
+# 5分ごとにチェック
 CHECK_INTERVAL_SECONDS = 5 * 60
 
-# 5時間50分間、連続監視
+# 5時間50分監視
 MONITOR_DURATION_SECONDS = 5 * 60 * 60 + 50 * 60
 
 
+# ==================================================
+# ログ
+# ==================================================
+
+def log(message=""):
+    print(message, flush=True)
+
+
+# ==================================================
+# 大人7,000円の＋ボタンを探す
+# ==================================================
+
 def find_adult_plus(page):
+
+    log("大人7,000円の＋ボタンを探しています...")
 
     locator = page.locator(
         f'button[aria-label="{ADULT_PLUS_LABEL}"]'
@@ -31,13 +46,11 @@ def find_adult_plus(page):
 
     count = locator.count()
 
-    print(
-        "大人＋ボタン候補数:",
-        count
+    log(
+        f"大人＋ボタン候補数: {count}"
     )
 
     if count == 0:
-
         raise RuntimeError(
             "大人7,000円の＋ボタンが見つかりませんでした。"
         )
@@ -45,16 +58,12 @@ def find_adult_plus(page):
     for i in range(count):
 
         try:
-
             button = locator.nth(i)
 
             if button.is_visible():
 
-                print(
-                    "大人＋ボタンを使用:",
-                    i + 1,
-                    "/",
-                    count
+                log(
+                    f"大人＋ボタンを使用: {i + 1} / {count}"
                 )
 
                 button.scroll_into_view_if_needed()
@@ -65,9 +74,8 @@ def find_adult_plus(page):
 
         except Exception as e:
 
-            print(
-                "ボタン取得エラー:",
-                e
+            log(
+                f"大人＋ボタン候補 {i + 1} の確認中にエラー: {e}"
             )
 
     raise RuntimeError(
@@ -75,6 +83,10 @@ def find_adult_plus(page):
         "見つけられませんでした。"
     )
 
+
+# ==================================================
+# 大人選択部分のテキストを取得
+# ==================================================
 
 def get_adult_area_text(page, adult_plus):
 
@@ -110,17 +122,20 @@ def get_adult_area_text(page, adult_plus):
 
     except Exception as e:
 
-        print(
-            "大人選択部分取得エラー:",
-            e
+        log(
+            f"大人選択部分取得エラー: {e}"
         )
 
         return ""
 
 
+# ==================================================
+# 大人2名を選択
+# ==================================================
+
 def select_two_adults(page):
 
-    print(
+    log(
         "大人7,000円の＋ボタンを探しています..."
     )
 
@@ -131,15 +146,14 @@ def select_two_adults(page):
         adult_plus
     )
 
-    print(
-        "大人選択部分:",
-        before_text
+    log(
+        f"大人選択部分: {before_text}"
     )
 
-    # すでに2名なら終了
+    # すでに2名の場合
     if "2 selected 2" in before_text:
 
-        print(
+        log(
             "すでに大人2名になっています。"
         )
 
@@ -149,7 +163,7 @@ def select_two_adults(page):
     # 1回目
     # ----------------------------------------------
 
-    print(
+    log(
         "大人＋ボタンを1回クリックします..."
     )
 
@@ -166,17 +180,15 @@ def select_two_adults(page):
         adult_plus
     )
 
-    print(
-        "大人選択部分:",
-        after_first_text
+    log(
+        f"大人選択部分: {after_first_text}"
     )
 
-    # 画面によってテキスト取得ができない場合があるため、
-    # selected文字列が取れなくても次へ進む。
+    # 1回目で2名になった場合
     if "2 selected 2" in after_first_text:
 
-        print(
-            "1回目のクリックですでに2名になりました。"
+        log(
+            "1回目のクリックですでに大人2名になりました。"
         )
 
         return
@@ -185,7 +197,7 @@ def select_two_adults(page):
     # 2回目
     # ----------------------------------------------
 
-    print(
+    log(
         "大人＋ボタンを2回目クリックします..."
     )
 
@@ -195,30 +207,30 @@ def select_two_adults(page):
 
     page.wait_for_timeout(2000)
 
-    print(
+    log(
         "大人2名の選択処理が完了しました。"
     )
 
 
+# ==================================================
+# カレンダー取得
+# ==================================================
+
 def get_calendar(page):
 
-    print(
+    log(
         "カレンダーを読み込んでいます..."
     )
-
-    # ----------------------------------------------
-    # カレンダーが表示されるまで待つ
-    # ----------------------------------------------
 
     page.wait_for_timeout(3000)
 
     # ----------------------------------------------
-    # 最後までスクロール
+    # ページを最後までスクロール
     # ----------------------------------------------
 
     last_height = 0
 
-    for _ in range(25):
+    for i in range(25):
 
         page.mouse.wheel(
             0,
@@ -231,19 +243,17 @@ def get_calendar(page):
             "document.body.scrollHeight"
         )
 
-        print(
-            "ページ高さ:",
-            height
+        log(
+            f"ページ高さ: {height}"
         )
 
         if height == last_height:
-
             break
 
         last_height = height
 
     # ----------------------------------------------
-    # カレンダー取得
+    # ボタン取得
     # ----------------------------------------------
 
     calendar = []
@@ -252,9 +262,8 @@ def get_calendar(page):
 
     count = buttons.count()
 
-    print(
-        "ボタン総数:",
-        count
+    log(
+        f"ボタン総数: {count}"
     )
 
     for i in range(count):
@@ -268,11 +277,9 @@ def get_calendar(page):
             )
 
             if not aria:
-
                 continue
 
             if "2026年" not in aria:
-
                 continue
 
             # --------------------------------------
@@ -292,17 +299,14 @@ def get_calendar(page):
                 price = ""
 
             # --------------------------------------
-            # 日付ボタンの文字
+            # 日付の表示文字
             # --------------------------------------
 
             text = button.text_content()
 
             if text:
-
                 text = text.strip()
-
             else:
-
                 text = ""
 
             # --------------------------------------
@@ -310,11 +314,8 @@ def get_calendar(page):
             # --------------------------------------
 
             try:
-
                 disabled = button.is_disabled()
-
             except Exception:
-
                 disabled = None
 
             # --------------------------------------
@@ -350,11 +351,14 @@ def get_calendar(page):
             )
 
         except Exception:
-
             pass
 
     return calendar
 
+
+# ==================================================
+# 販売可能日を判定
+# ==================================================
 
 def find_available_dates(calendar):
 
@@ -375,35 +379,23 @@ def find_available_dates(calendar):
             "aria_disabled"
         )
 
-        # ------------------------------------------
         # 7000円か
-        # ------------------------------------------
-
         price_is_7000 = (
             "7000" in price
             or "¥7,000" in price
         )
 
-        # ------------------------------------------
-        # ボタンが有効か
-        # ------------------------------------------
-
+        # disabledではない
         is_enabled = (
             disabled is False
         )
 
-        # ------------------------------------------
-        # aria-disabledも確認
-        # ------------------------------------------
-
+        # aria-disabledでも確認
         aria_is_enabled = (
             aria_disabled != "true"
         )
 
-        # ------------------------------------------
         # 最終判定
-        # ------------------------------------------
-
         if (
             price_is_7000
             and is_enabled
@@ -417,6 +409,10 @@ def find_available_dates(calendar):
     return available_dates
 
 
+# ==================================================
+# Discord通知
+# ==================================================
+
 def send_discord(available_dates):
 
     webhook = os.getenv(
@@ -425,7 +421,7 @@ def send_discord(available_dates):
 
     if not webhook:
 
-        print(
+        log(
             "DISCORD_WEBHOOK が設定されていません。"
         )
 
@@ -433,11 +429,11 @@ def send_discord(available_dates):
 
     if not available_dates:
 
-        print(
+        log(
             "販売可能日はありません。"
         )
 
-        print(
+        log(
             "Discord通知は行いません。"
         )
 
@@ -467,61 +463,64 @@ def send_discord(available_dates):
             timeout=20
         )
 
-        print(
-            "Discord response:",
-            response.status_code
+        log(
+            f"Discord response: {response.status_code}"
         )
 
         if response.status_code == 204:
 
-            print(
+            log(
                 "Discord通知に成功しました"
             )
 
             return True
 
-        print(
+        log(
             "Discord通知に失敗しました"
         )
 
-        print(
-            "Discord response body:",
-            response.text
+        log(
+            f"Discord response body: {response.text}"
         )
 
         return False
 
     except Exception as e:
 
-        print(
-            "Discord notification error:",
-            e
+        log(
+            f"Discord notification error: {e}"
         )
 
         return False
 
 
+# ==================================================
+# 1回分の監視
+# ==================================================
+
 def run_one_check(page, notified_dates):
 
-    print("")
-    print(
+    log("")
+    log(
         "=========================================="
     )
-    print(
-        "監視チェック開始:",
-        datetime.now().strftime(
+
+    log(
+        "監視チェック開始: "
+        + datetime.now().strftime(
             "%Y-%m-%d %H:%M:%S"
         )
     )
-    print(
+
+    log(
         "=========================================="
     )
 
     # ----------------------------------------------
-    # USJページを開く
+    # USJページ
     # ----------------------------------------------
 
-    print(
+    log(
         "USJページを開いています..."
     )
 
@@ -535,26 +534,25 @@ def run_one_check(page, notified_dates):
 
     except Exception as e:
 
-        print(
+        log(
             "ページ読み込みでエラーが発生しました:"
         )
 
-        print(
-            e
+        log(
+            str(e)
         )
 
-        print(
-            "60秒待たずにページ読み込みを終了し、"
-            "次回チェックへ進みます。"
+        log(
+            "今回のチェックを終了し、次回チェックへ進みます。"
         )
 
         return
 
-    page.wait_for_timeout(5000)
-
-    print(
+    log(
         "USJページ読み込み完了"
     )
+
+    page.wait_for_timeout(5000)
 
     # ----------------------------------------------
     # 大人2名
@@ -566,12 +564,12 @@ def run_one_check(page, notified_dates):
 
     except Exception as e:
 
-        print(
+        log(
             "大人2名選択でエラーが発生しました:"
         )
 
-        print(
-            e
+        log(
+            str(e)
         )
 
         try:
@@ -581,8 +579,11 @@ def run_one_check(page, notified_dates):
                 full_page=True
             )
 
-        except Exception:
+            log(
+                "error_adult.png を保存しました"
+            )
 
+        except Exception:
             pass
 
         return
@@ -597,29 +598,32 @@ def run_one_check(page, notified_dates):
 
     except Exception as e:
 
-        print(
+        log(
             "カレンダー取得でエラーが発生しました:"
         )
 
-        print(
-            e
+        log(
+            str(e)
         )
 
         return
 
-    print(
+    # ----------------------------------------------
+    # カレンダー表示
+    # ----------------------------------------------
+
+    log(
         "========== CALENDAR =========="
     )
 
     for item in calendar:
 
-        print(
-            item
+        log(
+            str(item)
         )
 
-    print(
-        "カレンダー件数:",
-        len(calendar)
+    log(
+        f"カレンダー件数: {len(calendar)}"
     )
 
     # ----------------------------------------------
@@ -641,15 +645,14 @@ def run_one_check(page, notified_dates):
                 indent=2
             )
 
-        print(
+        log(
             "calendar.json を保存しました"
         )
 
     except Exception as e:
 
-        print(
-            "calendar.json保存エラー:",
-            e
+        log(
+            f"calendar.json保存エラー: {e}"
         )
 
     # ----------------------------------------------
@@ -660,26 +663,41 @@ def run_one_check(page, notified_dates):
         calendar
     )
 
-    print(
-        "販売可能日数:",
-        len(available_dates)
+    log(
+        f"販売可能日数: {len(available_dates)}"
     )
 
     if available_dates:
 
-        print(
+        log(
             "========== 販売可能日 =========="
         )
 
         for item in available_dates:
 
-            print(
-                item
+            log(
+                str(item)
             )
 
     # ----------------------------------------------
-    # Discord通知
+    # Discord
     # ----------------------------------------------
+
+    webhook = os.getenv(
+        "DISCORD_WEBHOOK"
+    )
+
+    if webhook:
+
+        log(
+            "DISCORD_WEBHOOK: 設定されています"
+        )
+
+    else:
+
+        log(
+            "DISCORD_WEBHOOK: 設定されていません"
+        )
 
     new_available_dates = []
 
@@ -698,9 +716,9 @@ def run_one_check(page, notified_dates):
 
     if new_available_dates:
 
-        print(
-            "新しく見つかった販売可能日:",
-            len(new_available_dates)
+        log(
+            f"新しく見つかった販売可能日: "
+            f"{len(new_available_dates)}"
         )
 
         success = send_discord(
@@ -722,18 +740,18 @@ def run_one_check(page, notified_dates):
 
         if available_dates:
 
-            print(
+            log(
                 "販売可能日はありますが、"
-                "すでにこの監視セッションで通知済みです。"
+                "この監視セッションでは通知済みです。"
             )
 
         else:
 
-            print(
+            log(
                 "販売可能日はありません。"
             )
 
-            print(
+            log(
                 "Discord通知は行いません。"
             )
 
@@ -748,15 +766,14 @@ def run_one_check(page, notified_dates):
             full_page=True
         )
 
-        print(
+        log(
             "スクリーンショットを保存しました"
         )
 
     except Exception as e:
 
-        print(
-            "スクリーンショット保存エラー:",
-            e
+        log(
+            f"スクリーンショット保存エラー: {e}"
         )
 
 
@@ -764,134 +781,180 @@ def run_one_check(page, notified_dates):
 # メイン
 # ==================================================
 
-print(
-    "=========================================="
+log(
+    "### MONITOR.PY START ###"
 )
 
-print(
-    "USJ Monitor 開始"
+log(
+    "Pythonが開始しました。"
 )
 
-print(
-    "監視間隔:",
-    CHECK_INTERVAL_SECONDS,
-    "秒"
+log(
+    f"監視間隔: {CHECK_INTERVAL_SECONDS} 秒"
 )
 
-print(
-    "監視時間:",
-    MONITOR_DURATION_SECONDS,
-    "秒"
+log(
+    f"監視時間: {MONITOR_DURATION_SECONDS} 秒"
 )
 
-print(
-    "=========================================="
+log(
+    "Playwrightを開始します..."
 )
+
 
 notified_dates = set()
 
 start_time = time.time()
 
-with sync_playwright() as p:
+try:
 
-    browser = p.chromium.launch(
-        headless=True
+    with sync_playwright() as p:
+
+        log(
+            "Playwright開始成功"
+        )
+
+        log(
+            "Chromiumを起動します..."
+        )
+
+        browser = p.chromium.launch(
+            headless=True
+        )
+
+        log(
+            "Chromium起動成功"
+        )
+
+        page = browser.new_page(
+            viewport={
+                "width": 390,
+                "height": 844
+            }
+        )
+
+        log(
+            "ブラウザページ作成成功"
+        )
+
+        check_number = 0
+
+        while True:
+
+            elapsed = (
+                time.time()
+                - start_time
+            )
+
+            if elapsed >= MONITOR_DURATION_SECONDS:
+
+                log(
+                    "設定した監視時間が終了しました。"
+                )
+
+                break
+
+            check_number += 1
+
+            log("")
+            log(
+                "##########################################"
+            )
+
+            log(
+                f"監視回数: {check_number}"
+            )
+
+            log(
+                f"経過時間: {int(elapsed)} 秒"
+            )
+
+            log(
+                "##########################################"
+            )
+
+            try:
+
+                run_one_check(
+                    page,
+                    notified_dates
+                )
+
+            except Exception as e:
+
+                log(
+                    "監視チェック中に予期しないエラー:"
+                )
+
+                log(
+                    str(e)
+                )
+
+            # --------------------------------------
+            # 次回チェック
+            # --------------------------------------
+
+            elapsed = (
+                time.time()
+                - start_time
+            )
+
+            remaining = (
+                MONITOR_DURATION_SECONDS
+                - elapsed
+            )
+
+            if remaining <= 0:
+
+                break
+
+            wait_seconds = min(
+                CHECK_INTERVAL_SECONDS,
+                remaining
+            )
+
+            log("")
+            log(
+                f"次回チェックまで "
+                f"{int(wait_seconds)} 秒待機します。"
+            )
+
+            time.sleep(
+                wait_seconds
+            )
+
+        log(
+            "ブラウザを終了します..."
+        )
+
+        browser.close()
+
+        log(
+            "ブラウザ終了"
+        )
+
+except Exception as e:
+
+    log(
+        "=========================================="
     )
 
-    page = browser.new_page(
-        viewport={
-            "width": 390,
-            "height": 844
-        }
+    log(
+        "MONITOR.PYで致命的なエラーが発生しました"
     )
 
-    check_number = 0
+    log(
+        str(e)
+    )
 
-    while True:
+    log(
+        "=========================================="
+    )
 
-        elapsed = time.time() - start_time
+    raise
 
-        if elapsed >= MONITOR_DURATION_SECONDS:
 
-            print(
-                "監視時間終了です。"
-            )
-
-            break
-
-        check_number += 1
-
-        print("")
-        print(
-            "##########################################"
-        )
-
-        print(
-            "監視回数:",
-            check_number
-        )
-
-        print(
-            "経過時間:",
-            int(elapsed),
-            "秒"
-        )
-
-        print(
-            "##########################################"
-        )
-
-        try:
-
-            run_one_check(
-                page,
-                notified_dates
-            )
-
-        except Exception as e:
-
-            print(
-                "監視チェック中に予期しないエラー:"
-            )
-
-            print(
-                e
-            )
-
-        # ------------------------------------------
-        # 次回チェック
-        # ------------------------------------------
-
-        elapsed = time.time() - start_time
-
-        remaining = (
-            MONITOR_DURATION_SECONDS
-            - elapsed
-        )
-
-        if remaining <= 0:
-
-            break
-
-        wait_seconds = min(
-            CHECK_INTERVAL_SECONDS,
-            remaining
-        )
-
-        print("")
-        print(
-            "次回チェックまで",
-            int(wait_seconds),
-            "秒待機します。"
-        )
-
-        time.sleep(
-            wait_seconds
-        )
-
-    browser.close()
-
-print("")
-print(
+log("")
+log(
     "========== MONITOR COMPLETE =========="
-        )
+    )
