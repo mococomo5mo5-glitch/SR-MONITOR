@@ -6,6 +6,7 @@ on:
 jobs:
   monitor:
     runs-on: ubuntu-latest
+
     timeout-minutes: 360
 
     steps:
@@ -28,7 +29,7 @@ jobs:
 
       - name: Run monitor
         run: |
-          python monitor.py
+          python -u monitor.py
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
@@ -38,6 +39,7 @@ jobs:
         with:
           name: usj-calendar
           path: calendar.json
+          if-no-files-found: ignore
 
       - name: Upload Screenshot
         if: always()
@@ -45,3 +47,12 @@ jobs:
         with:
           name: usj-screenshot
           path: page.png
+          if-no-files-found: ignore
+
+      - name: Upload Error Screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: usj-error-screenshot
+          path: error_adult.png
+          if-no-files-found: ignore
