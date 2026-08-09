@@ -55,37 +55,79 @@ def find_adult_plus(page):
             "大人7,000円の＋ボタンが見つかりませんでした。"
         )
 
+    # --------------------------------------------------
+    # 今回の修正点
+    #
+    # is_visible() に頼らず、
+    # 候補の中から実際に操作できるものを探す
+    # --------------------------------------------------
+
     for i in range(count):
 
         try:
+
             button = locator.nth(i)
 
-            if button.is_visible():
+            log(
+                f"大人＋ボタン候補 {i + 1} を確認しています..."
+            )
 
-                log(
-                    f"大人＋ボタンを使用: {i + 1} / {count}"
+            # DOM上のボタンまでスクロール
+            try:
+                button.scroll_into_view_if_needed(
+                    timeout=5000
                 )
+            except Exception:
+                pass
 
-                button.scroll_into_view_if_needed()
+            page.wait_for_timeout(500)
 
-                page.wait_for_timeout(500)
+            # disabledかどうか確認
+            aria_disabled = button.get_attribute(
+                "aria-disabled"
+            )
 
-                return button
+            disabled = button.get_attribute(
+                "disabled"
+            )
+
+            log(
+                f"aria-disabled: {aria_disabled}, "
+                f"disabled: {disabled}"
+            )
+
+            if aria_disabled == "true":
+                log(
+                    f"候補 {i + 1} は無効なので次へ進みます。"
+                )
+                continue
+
+            if disabled is not None:
+                log(
+                    f"候補 {i + 1} はdisabledなので次へ進みます。"
+                )
+                continue
+
+            log(
+                f"大人＋ボタンを使用: {i + 1} / {count}"
+            )
+
+            return button
 
         except Exception as e:
 
             log(
-                f"大人＋ボタン候補 {i + 1} の確認中にエラー: {e}"
+                f"候補 {i + 1} の確認中にエラー: {e}"
             )
 
     raise RuntimeError(
-        "表示されている大人7,000円の＋ボタンを"
+        "使用可能な大人7,000円の＋ボタンを"
         "見つけられませんでした。"
     )
 
 
 # ==================================================
-# 大人選択部分のテキストを取得
+# 大人選択部分のテキスト取得
 # ==================================================
 
 def get_adult_area_text(page, adult_plus):
@@ -150,7 +192,10 @@ def select_two_adults(page):
         f"大人選択部分: {before_text}"
     )
 
+    # ----------------------------------------------
     # すでに2名の場合
+    # ----------------------------------------------
+
     if "2 selected 2" in before_text:
 
         log(
@@ -160,18 +205,26 @@ def select_two_adults(page):
         return
 
     # ----------------------------------------------
-    # 1回目
+    # 1回目クリック
     # ----------------------------------------------
 
     log(
         "大人＋ボタンを1回クリックします..."
     )
 
+    adult_plus.scroll_into_view_if_needed()
+
+    page.wait_for_timeout(500)
+
     adult_plus.click(
         timeout=30000
     )
 
     page.wait_for_timeout(1500)
+
+    # ----------------------------------------------
+    # クリック後の状態確認
+    # ----------------------------------------------
 
     adult_plus = find_adult_plus(page)
 
@@ -184,6 +237,11 @@ def select_two_adults(page):
         f"大人選択部分: {after_first_text}"
     )
 
+    log(
+        f"1回目クリック後の大人人数情報: "
+        f"{after_first_text}"
+    )
+
     # 1回目で2名になった場合
     if "2 selected 2" in after_first_text:
 
@@ -194,12 +252,16 @@ def select_two_adults(page):
         return
 
     # ----------------------------------------------
-    # 2回目
+    # 2回目クリック
     # ----------------------------------------------
 
     log(
         "大人＋ボタンを2回目クリックします..."
     )
+
+    adult_plus.scroll_into_view_if_needed()
+
+    page.wait_for_timeout(500)
 
     adult_plus.click(
         timeout=30000
@@ -207,9 +269,33 @@ def select_two_adults(page):
 
     page.wait_for_timeout(2000)
 
-    log(
-        "大人2名の選択処理が完了しました。"
+    # ----------------------------------------------
+    # 最終確認
+    # ----------------------------------------------
+
+    adult_plus = find_adult_plus(page)
+
+    final_text = get_adult_area_text(
+        page,
+        adult_plus
     )
+
+    log(
+        f"最終的な大人選択部分: {final_text}"
+    )
+
+    if "2 selected 2" in final_text:
+
+        log(
+            "大人2名を確認しました。"
+        )
+
+    else:
+
+        log(
+            "大人2名の表示を確認できませんでしたが、"
+            "カレンダー取得を続行します。"
+        )
 
 
 # ==================================================
@@ -314,8 +400,11 @@ def get_calendar(page):
             # --------------------------------------
 
             try:
+
                 disabled = button.is_disabled()
+
             except Exception:
+
                 disabled = None
 
             # --------------------------------------
@@ -395,7 +484,10 @@ def find_available_dates(calendar):
             aria_disabled != "true"
         )
 
-        # 最終判定
+        # ------------------------------------------
+        # 7000円 + disabledではない
+        # ------------------------------------------
+
         if (
             price_is_7000
             and is_enabled
@@ -957,4 +1049,4 @@ except Exception as e:
 log("")
 log(
     "========== MONITOR COMPLETE =========="
-    )
+        )
